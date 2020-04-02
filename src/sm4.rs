@@ -317,13 +317,14 @@ impl Sm4Cipher {
     pub fn new(key :&[byte;32]) -> Result<Self, &'static str> {
         if key.len() as i32 != BLOCK_SIZE {
             return Err("key size {} is invalid")
-        }else{}
-        let c = Sm4Cipher{
-           subkeys : generate_sub_keys(key),
-           block1 : [0;4],
-           block2 : [0b0; 16],
-        };
-        return Ok(c)
+        }else{
+            let c = Sm4Cipher{
+                subkeys : generate_sub_keys(key),
+                block1 : [0;4],
+                block2 : [0b0; 16],
+            };
+            return Ok(c)
+        }
     }
 
     pub fn block_size(&self) -> i32 {
