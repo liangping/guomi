@@ -1,6 +1,8 @@
-use bytes::Bytes;
-use pem;
-use std::fs;
+//use pem;
+use std::{
+    //fs,
+    convert::TryInto
+};
 
 const BlockSize:i32 = 16;
 type SM4Key = [byte;32];
@@ -10,8 +12,8 @@ type byte = u8;
 
 pub struct Sm4Cipher {
     subkeys: [u32; 32],
-	block1:  [u32; 64],
-	block2:  [byte; 64],
+	block1:  [u32; 4],
+	block2:  [byte; 16],
 }
 
 // sm4密钥参量
@@ -138,18 +140,19 @@ fn uint32(x: u8) ->u32 { return x as u32}
 //fn uint32(x: u32) ->u32 { return x }
 
 //非线性变换τ(.)
-fn p(a: u32) -> u32 {
-	return (uint32(sbox[a>>24]) << 24) ^ (uint32(sbox[(a>>16)&0xff]) << 16) ^ (uint32(sbox[(a>>8)&0xff]) << 8) ^ uint32(sbox[(a)&0xff])
+fn p(i: u32) -> u32 {
+    let a = i as usize;
+	return (uint32(sbox[(a>>24)]) << 24) ^ (uint32(sbox[(a>>16)&0xff]) << 16) ^ (uint32(sbox[(a>>8)&0xff]) << 8) ^ uint32(sbox[(a)&0xff])
 }
 
-fn permuteInitialBlock(b :&[u32], block :&[byte]) {
+fn permuteInitialBlock(b :&mut [u32;4], block :&[byte]) {
 	for i in 0..4 {
 		b[i] = (uint32(block[i*4]) << 24) | (uint32(block[i*4+1]) << 16) |
 			(uint32(block[i*4+2]) << 8) | (uint32(block[i*4+3]))
 	}
 }
 
-fn permuteFinalBlock(b :&[byte], block: &[u32]) {
+fn permuteFinalBlock(b :&mut [byte], block: &[u32]) {
 	for i in 0..4 {
 		b[i*4] = uint8(block[i] >> 24);
 		b[i*4+1] = uint8(block[i] >> 16);
@@ -159,7 +162,7 @@ fn permuteFinalBlock(b :&[byte], block: &[u32]) {
 }
 
 //修改后的加密核心函数
-fn cryptBlock(subkeys: &[u32;32], b: &[u32], r :&[byte], dst: &[byte], src : &[byte], decrypt: bool) {
+fn cryptBlock(subkeys: &[u32;32], b: &mut [u32;4], r :&mut [byte], dst: &mut [byte], src : &[byte], decrypt: bool) {
 	permuteInitialBlock(b, src);
 
 	// bounds check elimination in major encryption loop
@@ -167,26 +170,26 @@ fn cryptBlock(subkeys: &[u32;32], b: &[u32], r :&[byte], dst: &[byte], src : &[b
 	//_ = b[3]
 	if decrypt {
 		for i in 0..8 {
-			let s: = subkeys[31-4*i-3 .. 31-4*i-3+4];
-			let mut x = b[1] ^ b[2] ^ b[3] ^ s[3];
+			let s:[u32;4] = subkeys[31-4*i-3 .. 31-4*i-3+4].try_into().expect("size of key slice is invalid");
+			let mut x = (b[1] ^ b[2] ^ b[3] ^ s[3]) as usize;
 			b[0] = b[0] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
-			x = b[0] ^ b[2] ^ b[3] ^ s[2];
+			x = (b[0] ^ b[2] ^ b[3] ^ s[2]) as usize;
 			b[1] = b[1] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
-			x = b[0] ^ b[1] ^ b[3] ^ s[1];
+			x = (b[0] ^ b[1] ^ b[3] ^ s[1]) as usize;
 			b[2] = b[2] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
-			x = b[1] ^ b[2] ^ b[0] ^ s[0];
+			x = (b[1] ^ b[2] ^ b[0] ^ s[0]) as usize;
 			b[3] = b[3] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
 		}
 	} else {
 		for i in 0..8 {
-			let s = subkeys[4*i .. 4*i+4];
-			let mut x = b[1] ^ b[2] ^ b[3] ^ s[0];
+			let s:[u32;4] = subkeys[4*i .. 4*i+4].try_into().expect("size of key slice is invalid");
+			let mut x = (b[1] ^ b[2] ^ b[3] ^ s[0]) as usize;
 			b[0] = b[0] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
-			x = b[0] ^ b[2] ^ b[3] ^ s[1];
+			x = (b[0] ^ b[2] ^ b[3] ^ s[1]) as usize;
 			b[1] = b[1] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
-			x = b[0] ^ b[1] ^ b[3] ^ s[2];
+			x = (b[0] ^ b[1] ^ b[3] ^ s[2]) as usize;
 			b[2] = b[2] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
-			x = b[1] ^ b[2] ^ b[0] ^ s[3];
+			x = (b[1] ^ b[2] ^ b[0] ^ s[3]) as usize;
 			b[3] = b[3] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
 		}
     };
@@ -194,13 +197,13 @@ fn cryptBlock(subkeys: &[u32;32], b: &[u32], r :&[byte], dst: &[byte], src : &[b
     //b[0], b[1], b[2], b[3] = b[3], b[2], b[1], b[0];
     b.reverse();
 	permuteFinalBlock(r, b)
-    //copy(dst, r)
+    //copy(dst, r);
 }
 
 fn generateSubKeys(key :&[byte;32])-> [u32; 32] {
-	let subkeys: [u32; 32] = [0; 32];
-	let b : [u32; 4] = [0; 4];
-	permuteInitialBlock(&b, key);
+	let mut subkeys: [u32; 32] = [0; 32];
+	let mut b : [u32; 4] = [0; 4];
+	permuteInitialBlock(&mut b, key);
 	b[0] ^= fk[0];
 	b[1] ^= fk[1];
 	b[2] ^= fk[2];
@@ -216,18 +219,18 @@ fn generateSubKeys(key :&[byte;32])-> [u32; 32] {
 	return subkeys;
 }
 
-pub fn EncryptBlock(key: &SM4Key, dst: &[byte], src: &[byte]) {
+pub fn EncryptBlock(key: &SM4Key, dst: &mut [byte], src: &[byte]) {
 	let subkeys = generateSubKeys(key);
-	cryptBlock(&subkeys, &[0; 4], &[0x0; 16], dst, src, false)
+	cryptBlock(&subkeys, &mut [0; 4], &mut [0b0; 16], dst, src, false)
 }
 
-pub fn DecryptBlock(key: &SM4Key, dst:&[byte], src:&[byte]) {
+pub fn DecryptBlock(key: &SM4Key, dst:&mut [byte], src:&[byte]) {
 	let subkeys = generateSubKeys(key);
-	cryptBlock(&subkeys, &[0;4], &[0x0; 16], dst, src, true)
+	cryptBlock(&subkeys, &mut [0;4], &mut [0b0; 16], dst, src, true)
 }
 
-pub fn ReadKeyFromMem(data:[byte], pwd:[byte]) -> Result<SM4Key, error> {
-	let block =  pem::parse(SAMPLE_BYTES).unwrap();
+// pub fn ReadKeyFromMem(data:[byte], pwd:[byte]) -> Result<SM4Key, error> {
+// 	let block =  pem::parse(SAMPLE_BYTES).unwrap();
 	// if x509.IsEncryptedPEMBlock(block) {
 	// 	if block.Type != "SM4 ENCRYPTED KEY" {
 	// 		return nil, errors.New("SM4: unknown type")
@@ -245,20 +248,20 @@ pub fn ReadKeyFromMem(data:[byte], pwd:[byte]) -> Result<SM4Key, error> {
 	// 	return nil, errors.New("SM4: unknown type")
 	// }
 	// return block.Bytes, nil
-}
+// }
 
-pub fn ReadKeyFromPem(filename: String, pwd : &[byte]) -> Result<SM4Key, error> {
-	match fs::read(filename){
-        Ok(data) => {
-            return ReadKeyFromMem(data, pwd)
-        },
-        Err(e) => {
-            return Err
-        }
-    }
-}
+// pub fn ReadKeyFromPem(filename: String, pwd : &[byte]) -> Result<SM4Key, error> {
+// 	match fs::read(filename){
+//         Ok(data) => {
+//             return ReadKeyFromMem(data, pwd)
+//         },
+//         Err(e) => {
+//             return Err
+//         }
+//     }
+// }
 
-pub fn WriteKeytoMem(key :SM4Key, pwd :&[byte]) -> Result<[byte], error> {
+// pub fn WriteKeytoMem(key :SM4Key, pwd :&[byte]) -> Result<[byte], error> {
 	// if pwd != nil {
 	// 	block, err := x509.EncryptPEMBlock(rand.Reader,
 	// 		"SM4 ENCRYPTED KEY", key, pwd, x509.PEMCipherAES256)
@@ -273,9 +276,9 @@ pub fn WriteKeytoMem(key :SM4Key, pwd :&[byte]) -> Result<[byte], error> {
 	// 	}
 	// 	return pem.EncodeToMemory(block), nil
 	// }
-}
+// }
 
-pub fn WriteKeyToPem(FileName :String, key :SM4Key, pwd: &[byte]) -> Result<bool, error> {
+// pub fn WriteKeyToPem(FileName :String, key :SM4Key, pwd: &[byte]) -> Result<bool, error> {
 	// var block *pem.Block
 
 	// if pwd != nil {
@@ -301,7 +304,7 @@ pub fn WriteKeyToPem(FileName :String, key :SM4Key, pwd: &[byte]) -> Result<bool
 	// 	return false, nil
 	// }
 	// return true, nil
-}
+// }
 
 // impl KeySizeError {
 //     pub fn Error(&self) -> String {
@@ -311,26 +314,27 @@ pub fn WriteKeyToPem(FileName :String, key :SM4Key, pwd: &[byte]) -> Result<bool
 
 impl Sm4Cipher {
     // NewCipher creates and returns a new cipher.Block.
-    // pub fn NewCipher(key :&[byte]) -> Result<Self, error> {
-    //     if len(key) != BlockSize {
-    //         return nil, KeySizeError(len(key))
-    //     }
-    //     Sm4Cipher{
-    //     c.subkeys = generateSubKeys(key)
-    //     c.block1 = make([]uint32, 4)
-    //     c.block2 = make([]byte, 16)
-    //     return c, nil
-    // }
+    pub fn NewCipher(key :&[byte;32]) -> Result<Self, &'static str> {
+        if key.len() as i32 != BlockSize {
+            return Err("key size {} is invalid")
+        }else{}
+        let c = Sm4Cipher{
+           subkeys : generateSubKeys(key),
+           block1 : [0;4],
+           block2 : [0b0; 16],
+        };
+        return Ok(c)
+    }
 
     pub fn BlockSize(&self) -> i32 {
         return BlockSize
     }
 
-    pub fn Encrypt(&self, dst: &[byte], src :&[byte]) {
-        cryptBlock(&self.subkeys, &self.block1, &self.block2, dst, src, false)
+    pub fn Encrypt(&mut self, dst: &mut [byte], src :&[byte]) {
+        cryptBlock(&self.subkeys, &mut self.block1, &mut self.block2, dst, src, false)
     }
 
-    pub fn Decrypt(&self, dst: &[byte], src: &[byte]) {
-        cryptBlock(&self.subkeys, &self.block1, &self.block2, dst, src, true)
+    pub fn Decrypt(&mut self, dst: &mut [byte], src: &[byte]) {
+        cryptBlock(&self.subkeys, &mut self.block1, &mut self.block2, dst, src, true)
     }
 }
