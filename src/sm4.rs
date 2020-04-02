@@ -4,9 +4,8 @@ use std::{
     convert::TryInto
 };
 
-const BlockSize:i32 = 16;
+const BLOCK_SIZE:i32 = 16;
 type SM4Key = [byte;32];
-type KeySizeError = i32;
 #[allow(non_camel_case_types)]
 type byte = u8;
 
@@ -17,12 +16,12 @@ pub struct Sm4Cipher {
 }
 
 // sm4密钥参量
-const fk: [u32; 4] = [
+const FK: [u32; 4] = [
 	0xa3b1bac6, 0x56aa3350, 0x677d9197, 0xb27022dc,
 ];
 
 // sm4密钥参量
-const ck : [u32; 32] = [
+const CK : [u32; 32] = [
 	0x00070e15, 0x1c232a31, 0x383f464d, 0x545b6269,
 	0x70777e85, 0x8c939aa1, 0xa8afb6bd, 0xc4cbd2d9,
 	0xe0e7eef5, 0xfc030a11, 0x181f262d, 0x343b4249,
@@ -34,7 +33,7 @@ const ck : [u32; 32] = [
 ];
 
 // sm4密钥参量
-const sbox: [u8; 256] = [
+const SBOX: [u8; 256] = [
 	0xd6, 0x90, 0xe9, 0xfe, 0xcc, 0xe1, 0x3d, 0xb7, 0x16, 0xb6, 0x14, 0xc2, 0x28, 0xfb, 0x2c, 0x05,
 	0x2b, 0x67, 0x9a, 0x76, 0x2a, 0xbe, 0x04, 0xc3, 0xaa, 0x44, 0x13, 0x26, 0x49, 0x86, 0x06, 0x99,
 	0x9c, 0x42, 0x50, 0xf4, 0x91, 0xef, 0x98, 0x7a, 0x33, 0x54, 0x0b, 0x43, 0xed, 0xcf, 0xac, 0x62,
@@ -53,7 +52,7 @@ const sbox: [u8; 256] = [
 	0x18, 0xf0, 0x7d, 0xec, 0x3a, 0xdc, 0x4d, 0x20, 0x79, 0xee, 0x5f, 0x3e, 0xd7, 0xcb, 0x39, 0x48,
 ];
 
-const sbox0 : [u32; 256] = [
+const SBOX0 : [u32; 256] = [
 	0xd55b5b8e, 0x924242d0, 0xeaa7a74d, 0xfdfbfb06, 0xcf3333fc, 0xe2878765, 0x3df4f4c9, 0xb5dede6b, 0x1658584e, 0xb4dada6e, 0x14505044, 0xc10b0bca, 0x28a0a088, 0xf8efef17, 0x2cb0b09c, 0x05141411,
 	0x2bacac87, 0x669d9dfb, 0x986a6af2, 0x77d9d9ae, 0x2aa8a882, 0xbcfafa46, 0x04101014, 0xc00f0fcf, 0xa8aaaa02, 0x45111154, 0x134c4c5f, 0x269898be, 0x4825256d, 0x841a1a9e, 0x0618181e, 0x9b6666fd,
 	0x9e7272ec, 0x4309094a, 0x51414110, 0xf7d3d324, 0x934646d5, 0xecbfbf53, 0x9a6262f8, 0x7be9e992, 0x33ccccff, 0x55515104, 0x0b2c2c27, 0x420d0d4f, 0xeeb7b759, 0xcc3f3ff3, 0xaeb2b21c, 0x638989ea,
@@ -72,7 +71,7 @@ const sbox0 : [u32; 256] = [
 	0x18606078, 0xf3c3c330, 0x7cf5f589, 0xefb3b35c, 0x3ae8e8d2, 0xdf7373ac, 0x4c353579, 0x208080a0, 0x78e5e59d, 0xedbbbb56, 0x5e7d7d23, 0x3ef8f8c6, 0xd45f5f8b, 0xc82f2fe7, 0x39e4e4dd, 0x49212168,
 ];
 
-const sbox1 : [u32; 256] = [
+const SBOX1 : [u32; 256] = [
 	0x5b5b8ed5, 0x4242d092, 0xa7a74dea, 0xfbfb06fd, 0x3333fccf, 0x878765e2, 0xf4f4c93d, 0xdede6bb5, 0x58584e16, 0xdada6eb4, 0x50504414, 0x0b0bcac1, 0xa0a08828, 0xefef17f8, 0xb0b09c2c, 0x14141105,
 	0xacac872b, 0x9d9dfb66, 0x6a6af298, 0xd9d9ae77, 0xa8a8822a, 0xfafa46bc, 0x10101404, 0x0f0fcfc0, 0xaaaa02a8, 0x11115445, 0x4c4c5f13, 0x9898be26, 0x25256d48, 0x1a1a9e84, 0x18181e06, 0x6666fd9b,
 	0x7272ec9e, 0x09094a43, 0x41411051, 0xd3d324f7, 0x4646d593, 0xbfbf53ec, 0x6262f89a, 0xe9e9927b, 0xccccff33, 0x51510455, 0x2c2c270b, 0x0d0d4f42, 0xb7b759ee, 0x3f3ff3cc, 0xb2b21cae, 0x8989ea63,
@@ -91,7 +90,7 @@ const sbox1 : [u32; 256] = [
 	0x60607818, 0xc3c330f3, 0xf5f5897c, 0xb3b35cef, 0xe8e8d23a, 0x7373acdf, 0x3535794c, 0x8080a020, 0xe5e59d78, 0xbbbb56ed, 0x7d7d235e, 0xf8f8c63e, 0x5f5f8bd4, 0x2f2fe7c8, 0xe4e4dd39, 0x21216849,
 ];
 
-const sbox2:[u32; 256] = [
+const SBOX2:[u32; 256] = [
 	0x5b8ed55b, 0x42d09242, 0xa74deaa7, 0xfb06fdfb, 0x33fccf33, 0x8765e287, 0xf4c93df4, 0xde6bb5de, 0x584e1658, 0xda6eb4da, 0x50441450, 0x0bcac10b, 0xa08828a0, 0xef17f8ef, 0xb09c2cb0, 0x14110514,
 	0xac872bac, 0x9dfb669d, 0x6af2986a, 0xd9ae77d9, 0xa8822aa8, 0xfa46bcfa, 0x10140410, 0x0fcfc00f, 0xaa02a8aa, 0x11544511, 0x4c5f134c, 0x98be2698, 0x256d4825, 0x1a9e841a, 0x181e0618, 0x66fd9b66,
 	0x72ec9e72, 0x094a4309, 0x41105141, 0xd324f7d3, 0x46d59346, 0xbf53ecbf, 0x62f89a62, 0xe9927be9, 0xccff33cc, 0x51045551, 0x2c270b2c, 0x0d4f420d, 0xb759eeb7, 0x3ff3cc3f, 0xb21caeb2, 0x89ea6389,
@@ -110,7 +109,7 @@ const sbox2:[u32; 256] = [
 	0x60781860, 0xc330f3c3, 0xf5897cf5, 0xb35cefb3, 0xe8d23ae8, 0x73acdf73, 0x35794c35, 0x80a02080, 0xe59d78e5, 0xbb56edbb, 0x7d235e7d, 0xf8c63ef8, 0x5f8bd45f, 0x2fe7c82f, 0xe4dd39e4, 0x21684921,
 ];
 
-const sbox3 : [u32; 256] = [
+const SBOX3 : [u32; 256] = [
 	0x8ed55b5b, 0xd0924242, 0x4deaa7a7, 0x06fdfbfb, 0xfccf3333, 0x65e28787, 0xc93df4f4, 0x6bb5dede, 0x4e165858, 0x6eb4dada, 0x44145050, 0xcac10b0b, 0x8828a0a0, 0x17f8efef, 0x9c2cb0b0, 0x11051414,
 	0x872bacac, 0xfb669d9d, 0xf2986a6a, 0xae77d9d9, 0x822aa8a8, 0x46bcfafa, 0x14041010, 0xcfc00f0f, 0x02a8aaaa, 0x54451111, 0x5f134c4c, 0xbe269898, 0x6d482525, 0x9e841a1a, 0x1e061818, 0xfd9b6666,
 	0xec9e7272, 0x4a430909, 0x10514141, 0x24f7d3d3, 0xd5934646, 0x53ecbfbf, 0xf89a6262, 0x927be9e9, 0xff33cccc, 0x04555151, 0x270b2c2c, 0x4f420d0d, 0x59eeb7b7, 0xf3cc3f3f, 0x1caeb2b2, 0xea638989,
@@ -142,17 +141,17 @@ fn uint32(x: u8) ->u32 { return x as u32}
 //非线性变换τ(.)
 fn p(i: u32) -> u32 {
     let a = i as usize;
-	return (uint32(sbox[(a>>24)]) << 24) ^ (uint32(sbox[(a>>16)&0xff]) << 16) ^ (uint32(sbox[(a>>8)&0xff]) << 8) ^ uint32(sbox[(a)&0xff])
+	return (uint32(SBOX[(a>>24)]) << 24) ^ (uint32(SBOX[(a>>16)&0xff]) << 16) ^ (uint32(SBOX[(a>>8)&0xff]) << 8) ^ uint32(SBOX[(a)&0xff])
 }
 
-fn permuteInitialBlock(b :&mut [u32;4], block :&[byte]) {
+fn permute_initial_block(b :&mut [u32;4], block :&[byte]) {
 	for i in 0..4 {
 		b[i] = (uint32(block[i*4]) << 24) | (uint32(block[i*4+1]) << 16) |
 			(uint32(block[i*4+2]) << 8) | (uint32(block[i*4+3]))
 	}
 }
 
-fn permuteFinalBlock(b :&mut [byte], block: &[u32]) {
+fn permute_final_block(b :&mut [byte], block: &[u32]) {
 	for i in 0..4 {
 		b[i*4] = uint8(block[i] >> 24);
 		b[i*4+1] = uint8(block[i] >> 16);
@@ -162,8 +161,8 @@ fn permuteFinalBlock(b :&mut [byte], block: &[u32]) {
 }
 
 //修改后的加密核心函数
-fn cryptBlock(subkeys: &[u32;32], b: &mut [u32;4], r :&mut [byte], dst: &mut [byte], src : &[byte], decrypt: bool) {
-	permuteInitialBlock(b, src);
+fn crypt_block(subkeys: &[u32;32], b: &mut [u32;4], r :&mut [byte], dst: &mut [byte], src : &[byte], decrypt: bool) {
+	permute_initial_block(b, src);
 
 	// bounds check elimination in major encryption loop
 	// https://go101.org/article/bounds-check-elimination.html
@@ -172,44 +171,45 @@ fn cryptBlock(subkeys: &[u32;32], b: &mut [u32;4], r :&mut [byte], dst: &mut [by
 		for i in 0..8 {
 			let s:[u32;4] = subkeys[31-4*i-3 .. 31-4*i-3+4].try_into().expect("size of key slice is invalid");
 			let mut x = (b[1] ^ b[2] ^ b[3] ^ s[3]) as usize;
-			b[0] = b[0] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
+			b[0] = b[0] ^ SBOX0[x&0xff] ^ SBOX1[(x>>8)&0xff] ^ SBOX2[(x>>16)&0xff] ^ SBOX3[(x>>24)&0xff];
 			x = (b[0] ^ b[2] ^ b[3] ^ s[2]) as usize;
-			b[1] = b[1] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
+			b[1] = b[1] ^ SBOX0[x&0xff] ^ SBOX1[(x>>8)&0xff] ^ SBOX2[(x>>16)&0xff] ^ SBOX3[(x>>24)&0xff];
 			x = (b[0] ^ b[1] ^ b[3] ^ s[1]) as usize;
-			b[2] = b[2] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
+			b[2] = b[2] ^ SBOX0[x&0xff] ^ SBOX1[(x>>8)&0xff] ^ SBOX2[(x>>16)&0xff] ^ SBOX3[(x>>24)&0xff];
 			x = (b[1] ^ b[2] ^ b[0] ^ s[0]) as usize;
-			b[3] = b[3] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
+			b[3] = b[3] ^ SBOX0[x&0xff] ^ SBOX1[(x>>8)&0xff] ^ SBOX2[(x>>16)&0xff] ^ SBOX3[(x>>24)&0xff];
 		}
 	} else {
 		for i in 0..8 {
 			let s:[u32;4] = subkeys[4*i .. 4*i+4].try_into().expect("size of key slice is invalid");
 			let mut x = (b[1] ^ b[2] ^ b[3] ^ s[0]) as usize;
-			b[0] = b[0] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
+			b[0] = b[0] ^ SBOX0[x&0xff] ^ SBOX1[(x>>8)&0xff] ^ SBOX2[(x>>16)&0xff] ^ SBOX3[(x>>24)&0xff];
 			x = (b[0] ^ b[2] ^ b[3] ^ s[1]) as usize;
-			b[1] = b[1] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
+			b[1] = b[1] ^ SBOX0[x&0xff] ^ SBOX1[(x>>8)&0xff] ^ SBOX2[(x>>16)&0xff] ^ SBOX3[(x>>24)&0xff];
 			x = (b[0] ^ b[1] ^ b[3] ^ s[2]) as usize;
-			b[2] = b[2] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
+			b[2] = b[2] ^ SBOX0[x&0xff] ^ SBOX1[(x>>8)&0xff] ^ SBOX2[(x>>16)&0xff] ^ SBOX3[(x>>24)&0xff];
 			x = (b[1] ^ b[2] ^ b[0] ^ s[3]) as usize;
-			b[3] = b[3] ^ sbox0[x&0xff] ^ sbox1[(x>>8)&0xff] ^ sbox2[(x>>16)&0xff] ^ sbox3[(x>>24)&0xff];
+			b[3] = b[3] ^ SBOX0[x&0xff] ^ SBOX1[(x>>8)&0xff] ^ SBOX2[(x>>16)&0xff] ^ SBOX3[(x>>24)&0xff];
 		}
     };
     
     //b[0], b[1], b[2], b[3] = b[3], b[2], b[1], b[0];
     b.reverse();
-	permuteFinalBlock(r, b)
+	permute_final_block(r, b);
     //copy(dst, r);
+    dst.clone_from_slice(r);
 }
 
-fn generateSubKeys(key :&[byte;32])-> [u32; 32] {
+fn generate_sub_keys(key :&[byte;32])-> [u32; 32] {
 	let mut subkeys: [u32; 32] = [0; 32];
 	let mut b : [u32; 4] = [0; 4];
-	permuteInitialBlock(&mut b, key);
-	b[0] ^= fk[0];
-	b[1] ^= fk[1];
-	b[2] ^= fk[2];
-	b[3] ^= fk[3];
+	permute_initial_block(&mut b, key);
+	b[0] ^= FK[0];
+	b[1] ^= FK[1];
+	b[2] ^= FK[2];
+	b[3] ^= FK[3];
 	for i in 0..32 {
-        subkeys[i] = feistel0(b[0], b[1], b[2], b[3], ck[i]);
+        subkeys[i] = feistel0(b[0], b[1], b[2], b[3], CK[i]);
         //(b[0], b[1], b[2], b[3]) = (b[1], b[2], b[3], subkeys[i]);
         b.swap(0, 1);
         b.swap(1, 2);
@@ -219,14 +219,14 @@ fn generateSubKeys(key :&[byte;32])-> [u32; 32] {
 	return subkeys;
 }
 
-pub fn EncryptBlock(key: &SM4Key, dst: &mut [byte], src: &[byte]) {
-	let subkeys = generateSubKeys(key);
-	cryptBlock(&subkeys, &mut [0; 4], &mut [0b0; 16], dst, src, false)
+pub fn encrypt_block(key: &SM4Key, dst: &mut [byte], src: &[byte]) {
+	let subkeys = generate_sub_keys(key);
+	crypt_block(&subkeys, &mut [0; 4], &mut [0b0; 16], dst, src, false)
 }
 
-pub fn DecryptBlock(key: &SM4Key, dst:&mut [byte], src:&[byte]) {
-	let subkeys = generateSubKeys(key);
-	cryptBlock(&subkeys, &mut [0;4], &mut [0b0; 16], dst, src, true)
+pub fn decrypt_block(key: &SM4Key, dst:&mut [byte], src:&[byte]) {
+	let subkeys = generate_sub_keys(key);
+	crypt_block(&subkeys, &mut [0;4], &mut [0b0; 16], dst, src, true)
 }
 
 // pub fn ReadKeyFromMem(data:[byte], pwd:[byte]) -> Result<SM4Key, error> {
@@ -314,27 +314,27 @@ pub fn DecryptBlock(key: &SM4Key, dst:&mut [byte], src:&[byte]) {
 
 impl Sm4Cipher {
     // NewCipher creates and returns a new cipher.Block.
-    pub fn NewCipher(key :&[byte;32]) -> Result<Self, &'static str> {
-        if key.len() as i32 != BlockSize {
+    pub fn new(key :&[byte;32]) -> Result<Self, &'static str> {
+        if key.len() as i32 != BLOCK_SIZE {
             return Err("key size {} is invalid")
         }else{}
         let c = Sm4Cipher{
-           subkeys : generateSubKeys(key),
+           subkeys : generate_sub_keys(key),
            block1 : [0;4],
            block2 : [0b0; 16],
         };
         return Ok(c)
     }
 
-    pub fn BlockSize(&self) -> i32 {
-        return BlockSize
+    pub fn block_size(&self) -> i32 {
+        return BLOCK_SIZE
     }
 
-    pub fn Encrypt(&mut self, dst: &mut [byte], src :&[byte]) {
-        cryptBlock(&self.subkeys, &mut self.block1, &mut self.block2, dst, src, false)
+    pub fn encrypt(&mut self, dst: &mut [byte], src :&[byte]) {
+        crypt_block(&self.subkeys, &mut self.block1, &mut self.block2, dst, src, false)
     }
 
-    pub fn Decrypt(&mut self, dst: &mut [byte], src: &[byte]) {
-        cryptBlock(&self.subkeys, &mut self.block1, &mut self.block2, dst, src, true)
+    pub fn decrypt(&mut self, dst: &mut [byte], src: &[byte]) {
+        crypt_block(&self.subkeys, &mut self.block1, &mut self.block2, dst, src, true)
     }
 }
