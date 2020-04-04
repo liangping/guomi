@@ -5,15 +5,9 @@ use std::{
 };
 
 const BLOCK_SIZE:i32 = 16;
-type SM4Key = [byte;32];
+type SM4Key = [byte;16];
 #[allow(non_camel_case_types)]
 type byte = u8;
-
-pub struct Sm4Cipher {
-    subkeys: [u32; 32],
-	block1:  [u32; 4],
-	block2:  [byte; 16],
-}
 
 // sm4密钥参量
 const FK: [u32; 4] = [
@@ -161,7 +155,7 @@ fn permute_final_block(b :&mut [byte], block: &[u32]) {
 }
 
 //修改后的加密核心函数
-fn crypt_block(subkeys: &[u32;32], b: &mut [u32;4], r :&mut [byte], dst: &mut [byte], src : &[byte], decrypt: bool) {
+fn crypt_block<'a>(subkeys: &[u32;32], b: &mut [u32;4], r :&mut [byte;16], src : &[byte], decrypt: bool) -> [u8;16]{
 	permute_initial_block(b, src);
 
 	// bounds check elimination in major encryption loop
@@ -197,10 +191,12 @@ fn crypt_block(subkeys: &[u32;32], b: &mut [u32;4], r :&mut [byte], dst: &mut [b
     b.reverse();
 	permute_final_block(r, b);
     //copy(dst, r);
-    dst.clone_from_slice(r);
+	let mut dst:[u8;16] = [0;16];
+	dst.clone_from_slice(r);
+	dst
 }
 
-fn generate_sub_keys(key :&[byte;32])-> [u32; 32] {
+fn generate_sub_keys(key :&[byte;16])-> [u32; 32] {
 	let mut subkeys: [u32; 32] = [0; 32];
 	let mut b : [u32; 4] = [0; 4];
 	permute_initial_block(&mut b, key);
@@ -219,102 +215,26 @@ fn generate_sub_keys(key :&[byte;32])-> [u32; 32] {
 	return subkeys;
 }
 
-pub fn encrypt_block(key: &SM4Key, dst: &mut [byte], src: &[byte]) {
+pub fn encrypt(key: &SM4Key, src: &[byte]) -> [u8;16] {
 	let subkeys = generate_sub_keys(key);
-	crypt_block(&subkeys, &mut [0; 4], &mut [0b0; 16], dst, src, false)
+	crypt_block(&subkeys, &mut [0; 4], &mut [0b0; 16], src, false)
 }
 
-pub fn decrypt_block(key: &SM4Key, dst:&mut [byte], src:&[byte]) {
+pub fn decrypt(key: &SM4Key, src:&[byte]) ->[u8;16] {
 	let subkeys = generate_sub_keys(key);
-	crypt_block(&subkeys, &mut [0;4], &mut [0b0; 16], dst, src, true)
+	crypt_block(&subkeys, &mut [0;4], &mut [0b0; 16], src, true)
 }
 
-// pub fn ReadKeyFromMem(data:[byte], pwd:[byte]) -> Result<SM4Key, error> {
-// 	let block =  pem::parse(SAMPLE_BYTES).unwrap();
-	// if x509.IsEncryptedPEMBlock(block) {
-	// 	if block.Type != "SM4 ENCRYPTED KEY" {
-	// 		return nil, errors.New("SM4: unknown type")
-	// 	}
-	// 	if pwd == nil {
-	// 		return nil, errors.New("SM4: need passwd")
-	// 	}
-	// 	data, err := x509.DecryptPEMBlock(block, pwd)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	return data, nil
-	// }
-	// if block.Type != "SM4 KEY" {
-	// 	return nil, errors.New("SM4: unknown type")
-	// }
-	// return block.Bytes, nil
-// }
-
-// pub fn ReadKeyFromPem(filename: String, pwd : &[byte]) -> Result<SM4Key, error> {
-// 	match fs::read(filename){
-//         Ok(data) => {
-//             return ReadKeyFromMem(data, pwd)
-//         },
-//         Err(e) => {
-//             return Err
-//         }
-//     }
-// }
-
-// pub fn WriteKeytoMem(key :SM4Key, pwd :&[byte]) -> Result<[byte], error> {
-	// if pwd != nil {
-	// 	block, err := x509.EncryptPEMBlock(rand.Reader,
-	// 		"SM4 ENCRYPTED KEY", key, pwd, x509.PEMCipherAES256)
-	// 	if err != nil {
-	// 		return nil, err
-	// 	}
-	// 	return pem.EncodeToMemory(block), nil
-	// } else {
-	// 	block := &pem.Block{
-	// 		Type:  "SM4 KEY",
-	// 		Bytes: key,
-	// 	}
-	// 	return pem.EncodeToMemory(block), nil
-	// }
-// }
-
-// pub fn WriteKeyToPem(FileName :String, key :SM4Key, pwd: &[byte]) -> Result<bool, error> {
-	// var block *pem.Block
-
-	// if pwd != nil {
-	// 	var err error
-	// 	block, err = x509.EncryptPEMBlock(rand.Reader,
-	// 		"SM4 ENCRYPTED KEY", key, pwd, x509.PEMCipherAES256)
-	// 	if err != nil {
-	// 		return false, err
-	// 	}
-	// } else {
-	// 	block = &pem.Block{
-	// 		Type:  "SM4 KEY",
-	// 		Bytes: key,
-	// 	}
-	// }
-	// file, err := os.Create(FileName)
-	// if err != nil {
-	// 	return false, err
-	// }
-	// defer file.Close()
-	// err = pem.Encode(file, block)
-	// if err != nil {
-	// 	return false, nil
-	// }
-	// return true, nil
-// }
-
-// impl KeySizeError {
-//     pub fn Error(&self) -> String {
-//         return "SM4: invalid key size " + strconv.Itoa(int(k));
-//     }
-// }
+pub struct Sm4Cipher {
+    subkeys: [u32; 32],
+	block1:  [u32; 4],
+	block2:  [byte; 16],
+}
 
 impl Sm4Cipher {
     // NewCipher creates and returns a new cipher.Block.
-    pub fn new(key :&[byte;32]) -> Result<Self, &'static str> {
+	pub fn new(key :&[byte; 16]) -> Result<Self, &'static str> {
+		println!("{:?}", key.len() );
         if key.len() as i32 != BLOCK_SIZE {
             return Err("key size {} is invalid")
         }else{
@@ -331,11 +251,11 @@ impl Sm4Cipher {
         return BLOCK_SIZE
     }
 
-    pub fn encrypt(&mut self, dst: &mut [byte], src :&[byte]) {
-        crypt_block(&self.subkeys, &mut self.block1, &mut self.block2, dst, src, false)
+    pub fn encrypt(&mut self, src :&[byte]) -> [u8;16] {
+        crypt_block(&self.subkeys, &mut self.block1, &mut self.block2, src, false)
     }
 
-    pub fn decrypt(&mut self, dst: &mut [byte], src: &[byte]) {
-        crypt_block(&self.subkeys, &mut self.block1, &mut self.block2, dst, src, true)
+    pub fn decrypt(&mut self, src: &[byte]) -> [u8;16]{
+        crypt_block(&self.subkeys, &mut self.block1, &mut self.block2, src, true)
     }
 }
